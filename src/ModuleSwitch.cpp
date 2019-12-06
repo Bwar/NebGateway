@@ -2,91 +2,79 @@
  * Project:  InterfaceServer
  * @file     ModuleSwitch.cpp
  * @brief 
- * @author   lbh
+ * @author   Bwar
  * @date:    2016年7月6日
  * @note
  * Modify history:
  ******************************************************************************/
 #include <fstream>
+#include <set>
 #include "ModuleSwitch.hpp"
 
-namespace inter
+namespace gate
 {
 
 ModuleSwitch::ModuleSwitch(const std::string& strModulePath)
-    : neb::Module(strModulePath), pStepSwitch(nullptr)
+    : neb::Module(strModulePath)
 {
 }
 
 ModuleSwitch::~ModuleSwitch()
 {
-    for (auto iter = m_mapModuleConf.begin();
-             iter != m_mapModuleConf.end(); ++iter)
-    {
-        if (iter->second != NULL)
-        {
-            delete iter->second;
-            iter->second = NULL;
-        }
-    }
-    m_mapModuleConf.clear();
 }
 
 bool ModuleSwitch::Init()
 {
-    std::string strConfFile = GetWorkPath() + std::string("/conf/ModuleSwitch.json");
+    std::string strConfFile = GetWorkPath() + std::string("/conf/gateway_route.json");
     LOG4_DEBUG("CONF FILE = %s.", strConfFile.c_str());
 
     std::ifstream fin(strConfFile.c_str());
     if (fin.good())
     {
         std::stringstream ssContent;
-        neb::CJsonObject oSwitchConf;
+        neb::CJsonObject oGatewayConf;
         ssContent << fin.rdbuf();
         fin.close();
-        if (oSwitchConf.Parse(ssContent.str()))
+        if (oGatewayConf.Parse(ssContent.str()))
         {
-            std::string strUrlPath;
-            int iCmd = 0;
-            neb::CJsonObject* pModuleJson = NULL;
-            if (oSwitchConf["module"].IsEmpty())
+            std::string strKey;
+            std::set<std::string> setKeys;
+            while (oGatewayConf["url_path_route"].GetKey(strKey))
             {
-                LOG4_WARNING("oSwitchConf[\"module\"] is empty!");
-            }
-            for (int i = 0; i < oSwitchConf["module"].GetArraySize(); ++i)
-            {
-                if (std::string("/im/hello_switch") == oSwitchConf["module"][i]("url_path"))
+                if (setKeys.find(strKey) != setKeys.end())
                 {
+                    LOG4_ERROR("the path \"%s\" is duplicate, skip it.", strKey.c_str());
                     continue;
                 }
-                bool bAcceptModule = false;
-                pModuleJson = new neb::CJsonObject(oSwitchConf["module"][i]);
-                if (pModuleJson->Get("url_path", strUrlPath) && pModuleJson->Get("cmd", iCmd))
+                auto pSharedSession = MakeSharedSession("gate::SessionRoute", strKey);
+                if (pSharedSession != nullptr)
                 {
-                    for (int j = 0; j < (*pModuleJson)["node_type"].GetArraySize(); ++j)
-                    {
-                        if ((*pModuleJson)["node_type"](j) == GetNodeType())
-                        {
-                            m_mapModuleConf.insert(std::make_pair(strUrlPath, pModuleJson));
-                            bAcceptModule = true;
-                            break;
-                        }
-                    }
-                    if (!bAcceptModule)
-                    {
-                        DELETE(pModuleJson);
-                    }
+                    std::shared_ptr<SessionRoute> pRoute
+                        = std::dynamic_pointer_cast<SessionRoute>(pSharedSession);
+                    pRoute->Init(oGatewayConf["url_path_route"][strKey]);
+                    setKeys.insert(strKey);
                 }
-                else
+            }
+            while (oGatewayConf["http_header_route"].GetKey(strKey))
+            {
+                if (setKeys.find(strKey) != setKeys.end())
                 {
-                    LOG4_ERROR("miss \"url_paht\" or \"cmd\" in oSwitchConf[\"module\"][%d]", i);
-                    DELETE(pModuleJson);
+                    LOG4_ERROR("the x-Route value \"%s\" is duplicate, skip it.", strKey.c_str());
+                    continue;
+                }
+                auto pSharedSession = MakeSharedSession("gate::SessionRoute", strKey);
+                if (pSharedSession != nullptr)
+                {
+                    std::shared_ptr<SessionRoute> pRoute
+                        = std::dynamic_pointer_cast<SessionRoute>(pSharedSession);
+                    pRoute->Init(oGatewayConf["http_header_route"][strKey]);
+                    setKeys.insert(strKey);
                 }
             }
         }
         else
         {
-            LOG4_ERROR("oSwitchConf pasre error");
+            LOG4_ERROR("oGatewayConf pasre error");
             return(false);
         }
     }
@@ -101,41 +89,62 @@ bool ModuleSwitch::Init()
 }
 
 bool ModuleSwitch::AnyMessage(
-                std::shared_ptr<neb::SocketChannel> pUpstreamChannel,
+                std::shared_ptr<neb::SocketChannel> pChannel,
                 const HttpMsg& oInHttpMsg)
 {
     if (HTTP_OPTIONS == oInHttpMsg.method())
     {
         LOG4_TRACE("receive an OPTIONS");
-        ResponseOptions(pUpstreamChannel, oInHttpMsg);
+        ResponseOptions(pChannel, oInHttpMsg);
         return(true);
     }
-    auto module_conf_iter = m_mapModuleConf.find(oInHttpMsg.path());
-    if (module_conf_iter == m_mapModuleConf.end())
+    auto pSharedSession = GetSession(oInHttpMsg.path());
+    if (pSharedSession == nullptr)
     {
-        HttpMsg oOutHttpMsg;
-        LOG4_ERROR("no cmd config for %s in \"ModuleSwitch.json\"!", oInHttpMsg.path().c_str());
-        oOutHttpMsg.set_type(HTTP_RESPONSE);
-        oOutHttpMsg.set_status_code(404);
-        oOutHttpMsg.set_http_major(oInHttpMsg.http_major());
-        oOutHttpMsg.set_http_minor(oInHttpMsg.http_minor());
-        SendTo(pUpstreamChannel, oOutHttpMsg);
-        return(false);
-    }
-
-    pStepSwitch = std::dynamic_pointer_cast<StepSwitch>(MakeSharedStep("inter::StepSwitch", pUpstreamChannel, oInHttpMsg, module_conf_iter->second));
-    if ((pStepSwitch))
-    {
-        if (neb::CMD_STATUS_RUNNING == pStepSwitch->Emit(neb::ERR_OK))
+        auto header_iter = oInHttpMsg.headers().find("x-Route");
+        if (header_iter != oInHttpMsg.headers().end())
         {
-            LOG4_TRACE("pStepSwitch running");
-            return(true);
+            pSharedSession = GetSession(header_iter->second);
+        }
+        if (pSharedSession == nullptr)
+        {
+            HttpMsg oOutHttpMsg;
+            LOG4_ERROR("no path \"%s\" or x-Route header \"%s\" config in \"gateway_route.json\"!",
+                    oInHttpMsg.path().c_str(), header_iter->second.c_str());
+            oOutHttpMsg.set_type(HTTP_RESPONSE);
+            oOutHttpMsg.set_status_code(404);
+            oOutHttpMsg.set_http_major(oInHttpMsg.http_major());
+            oOutHttpMsg.set_http_minor(oInHttpMsg.http_minor());
+            SendTo(pChannel, oOutHttpMsg);
+            return(false);
         }
     }
-    return(false);
+
+    std::string strService;
+    std::shared_ptr<SessionRoute> pSharedRoute
+        = std::dynamic_pointer_cast<SessionRoute>(pSharedSession);
+    if (pSharedRoute->ApplyService(strService))
+    {
+        auto pStepSwitch = MakeSharedStep("gate::StepSwitch", pChannel,
+                oInHttpMsg, strService, pSharedRoute);
+        if ((pStepSwitch))
+        {
+            if (neb::CMD_STATUS_RUNNING == pStepSwitch->Emit())
+            {
+                LOG4_TRACE("pStepSwitch running");
+                return(true);
+            }
+        }
+    }
+    else
+    {
+        Response(pChannel, oInHttpMsg, 10009, "Concurrent request exceed 5! response by gateway.");
+        return(true);
+    }
 }
 
-void ModuleSwitch::Response(std::shared_ptr<neb::SocketChannel> pUpstreamChannel, const HttpMsg& oInHttpMsg, int iErrno, const std::string& strErrMsg)
+void ModuleSwitch::Response(std::shared_ptr<neb::SocketChannel> pChannel,
+        const HttpMsg& oInHttpMsg, int iErrno, const std::string& strErrMsg)
 {
     HttpMsg oHttpMsg;
     neb::CJsonObject oResponseData;
@@ -150,10 +159,12 @@ void ModuleSwitch::Response(std::shared_ptr<neb::SocketChannel> pUpstreamChannel
         oResponseData.Add("data", neb::CJsonObject("[]"));
     }
     oHttpMsg.set_body(oResponseData.ToFormattedString());
-    SendTo(pUpstreamChannel, oHttpMsg);
+    SendTo(pChannel, oHttpMsg);
 }
 
-void ModuleSwitch::ResponseOptions(std::shared_ptr<neb::SocketChannel> pUpstreamChannel, const HttpMsg& oInHttpMsg)
+void ModuleSwitch::ResponseOptions(
+        std::shared_ptr<neb::SocketChannel> pChannel,
+        const HttpMsg& oInHttpMsg)
 {
     LOG4_DEBUG("%s()", __FUNCTION__);
     HttpMsg oHttpMsg;
@@ -166,7 +177,7 @@ void ModuleSwitch::ResponseOptions(std::shared_ptr<neb::SocketChannel> pUpstream
     oHttpMsg.mutable_headers()->insert(google::protobuf::MapPair<std::string, std::string>("Access-Control-Allow-Headers", "Origin, Content-Type, Cookie, Accept"));
     oHttpMsg.mutable_headers()->insert(google::protobuf::MapPair<std::string, std::string>("Access-Control-Allow-Methods", "GET, POST"));
     oHttpMsg.mutable_headers()->insert(google::protobuf::MapPair<std::string, std::string>("Access-Control-Allow-Credentials", "true"));
-    SendTo(pUpstreamChannel, oHttpMsg);
+    SendTo(pChannel, oHttpMsg);
 }
 
 } /* namespace inter */

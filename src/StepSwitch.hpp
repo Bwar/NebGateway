@@ -1,56 +1,49 @@
 /*******************************************************************************
- * Project:  InterfaceServer
+ * Project:  NebGateway
  * @file     StepSwitch.hpp
- * @brief    将http请求转换成内部协议到Logic服务器进行处理
- * @author   lbh
+ * @brief
+ * @author   Bwar
  * @date:    2016年7月6日
  * @note
  * Modify history:
  ******************************************************************************/
-#ifndef SRC_MODULESWITCH_STEPSWITCH_HPP_
-#define SRC_MODULESWITCH_STEPSWITCH_HPP_
+#ifndef SRC_STEPSWITCH_HPP_
+#define SRC_STEPSWITCH_HPP_
 
-#include <actor/step/PbStep.hpp>
-#include "util/json/CJsonObject.hpp"
+#include <actor/step/HttpStep.hpp>
+#include <util/json/CJsonObject.hpp>
+#include "SessionRoute.hpp"
 
-namespace inter
+namespace gate
 {
 
-class StepSwitch: public neb::PbStep, public neb::DynamicCreator<StepSwitch, std::shared_ptr<neb::SocketChannel>, HttpMsg, neb::CJsonObject*>
+class StepSwitch: public neb::HttpStep, public neb::DynamicCreator<StepSwitch,
+    std::shared_ptr<neb::SocketChannel>, HttpMsg, std::string, std::shared_ptr<SessionRoute>>
 {
 public:
-    StepSwitch(std::shared_ptr<neb::SocketChannel> pUpstreamChannel, const HttpMsg& oInHttpMsg, const neb::CJsonObject* pModuleConf);
+    StepSwitch(std::shared_ptr<neb::SocketChannel> pChannel, const HttpMsg& oInHttpMsg,
+            const std::string& strTargetService, std::shared_ptr<SessionRoute> pRoute);
     virtual ~StepSwitch();
 
     virtual neb::E_CMD_STATUS Emit(int iErrno, const std::string& strErrMsg = "",  void* data = NULL);
 
     virtual neb::E_CMD_STATUS Callback(
                     std::shared_ptr<neb::SocketChannel> pUpstreamChannel,
-                    const MsgHead& oInMsgHead,
-                    const MsgBody& oInMsgBody,
+                    const HttpMsg& oHttpMsg,
                     void* data = NULL);
 
     virtual neb::E_CMD_STATUS Timeout();
 
-    virtual std::string ObjectName() const
-    {
-        return("inter::StepSwitch");
-    }
-
 protected:
-    virtual neb::E_CMD_STATUS EmitSwitch();
-    virtual neb::E_CMD_STATUS CallbackSwitch(std::shared_ptr<neb::SocketChannel> pUpstreamChannel,
-                        const MsgHead& oInMsgHead, const MsgBody& oInMsgBody);
-
-    void Response(int iErrno, const std::string& strErrMsg, const std::string& strErrClientShow);
+    bool Response(const std::string& strData);
 
 private:
-    std::shared_ptr<neb::SocketChannel> m_pRequestUpstreamChannel;
-    HttpMsg m_oInHttpMsg;
-    neb::CJsonObject m_oModuleConf;
-    MsgBody m_oSwitchMsgBody;
+    std::shared_ptr<neb::SocketChannel> m_pChannel;
+    HttpMsg m_oReqHttpMsg;
+    std::string m_strService;
+    std::shared_ptr<SessionRoute> m_pRoute;
 };
 
-} /* namespace im */
+} /* namespace gate */
 
-#endif /* SRC_MODULESWITCH_STEPSWITCH_HPP_ */
+#endif /* SRC_STEPSWITCH_HPP_ */

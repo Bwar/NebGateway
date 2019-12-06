@@ -1,3 +1,3 @@
-# NebulaInterface
-NebulaInterface is a http access service for Nebula Clusters.
-NebulaInterface是Nebula集群的一个采用http接入的服务。
+# NebGateway
+NebGateway is a http gateway base on for Nebula.
+NebGateway是基于Nebula框架的http网关，从NebulaInterface修改而来。

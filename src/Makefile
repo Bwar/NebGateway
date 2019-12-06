@@ -16,9 +16,9 @@ SYSTEM_LIB_PATH:=/usr/lib
 endif
 LIB3RD_PATH = ../../NebulaDepend
 NEBULA_PATH = ../../Nebula
-INTERFACE_PATH = ..
+GATEWAY_PATH = ..
 
-VPATH = $(INTERFACE_PATH)/src
+VPATH = $(GATEWAY_PATH)/src
 SUB_DIRS := $(foreach dir, $(VPATH), $(shell find $(dir) -maxdepth 5 -type d))
 DIRS := $(SUB_DIRS)
 
@@ -26,7 +26,7 @@ DIRS := $(SUB_DIRS)
 INC := $(INC) \
        -I $(LIB3RD_PATH)/include \
        -I $(NEBULA_PATH)/include \
-       -I $(INTERFACE_PATH)/src 
+       -I $(GATEWAY_PATH)/src 
 
 
 LDFLAGS := $(LDFLAGS) -D_LINUX_OS_ \
@@ -42,14 +42,14 @@ CC_SRCS = $(foreach dir, $(DIRS), $(wildcard $(dir)/*.cc))
 C_SRCS = $(foreach dir, $(DIRS), $(wildcard $(dir)/*.c))
 OBJS = $(patsubst %.cpp,%.o,$(CPP_SRCS)) $(patsubst %.c,%.o,$(C_SRCS)) $(patsubst %.cc,%.o,$(CC_SRCS))
 
-TARGET = NebulaInterface
+TARGET = NebGateway
 
 all: $(TARGET)
 	
-NebulaInterface: $(OBJS)
+NebGateway: $(OBJS)
 	$(CXX) $(CXXFLAG) $(DEFINE_SERVER) -o $@ $(OBJS) $(LDFLAGS) $(INC)
-	mkdir -p $(INTERFACE_PATH)/bin	
-	cp -f $@ $(INTERFACE_PATH)/bin/
+	mkdir -p $(GATEWAY_PATH)/bin	
+	cp -f $@ $(GATEWAY_PATH)/bin/
 
 %.o:%.cpp
 	$(CXX) $(INC) $(CXXFLAG) $(CFLAGS) $(DEFINE_SERVER) -c -o $@ $< $(LDFLAGS)
@@ -60,4 +60,4 @@ NebulaInterface: $(OBJS)
 clean:
 	rm -f $(OBJS)
 	rm -f $(TARGET)
-	rm -rf $(INTERFACE_PATH)/bin
+	rm -rf $(GATEWAY_PATH)/bin

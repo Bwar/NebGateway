@@ -1,0 +1,30 @@
+{
+	"url_path_route":{
+        "/ai/hello":{
+            "app":"neb",
+            "timeout":1.0,
+            "max_concurrent_per_service":200,
+            "success_rate":0.99,
+            "stat_interval":60,
+            "schema":"http",
+            "service":[
+                "192.168.157.135:17007"
+            ]
+        }
+    },
+    
+    "//http_header_route":"http header name must be \"x-Route\", e.g. \"x-Route:audio\"",
+    "http_header_route":{
+        "audio":{
+            "app":"neb",
+            "timeout":1.0,
+            "max_concurrent_per_service":200,
+            "success_rate":0.99,
+            "stat_interval":60,
+            "schema":"http",
+            "service":[
+                "192.168.157.135:17007"
+            ]
+        }
+    }
+}

@@ -1,8 +1,8 @@
 /*******************************************************************************
-* Project:  Beacon
-* @file     Beacon.cpp
+* Project:  NebGateway
+* @file     Gateway.cpp
 * @brief 
-* @author   bwar
+* @author   Bwar
 * @date:    Apr 7, 2018
 * @note
 * Modify history:

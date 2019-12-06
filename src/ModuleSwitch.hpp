@@ -2,7 +2,7 @@
  * Project:  InterfaceServer
  * @file     ModuleSwitch.hpp
  * @brief    Http请求转换器
- * @author   lbh
+ * @author   Bwar
  * @date:    2016年7月6日
  * @note     将http请求转换成内部协议到Logic服务器进行处理
  * Modify history:
@@ -17,7 +17,7 @@
 #include <actor/cmd/Module.hpp>
 #include "StepSwitch.hpp"
 
-namespace inter
+namespace gate
 {
 
 class ModuleSwitch: public neb::Module, public neb::DynamicCreator<ModuleSwitch, std::string>
@@ -37,14 +37,8 @@ protected:
                     int iErrno, const std::string& strErrMsg);
     void ResponseOptions(
             std::shared_ptr<neb::SocketChannel> pUpstreamChannel, const HttpMsg& oInHttpMsg);
-
-private:
-    std::unordered_map<std::string, neb::CJsonObject*> m_mapModuleConf;
-
-public:
-    std::shared_ptr<StepSwitch> pStepSwitch;
 };
 
-} /* namespace inter */
+} /* namespace gate */
 
 #endif /* SRC_MODULESWITCH_MODULESWITCH_HPP_ */
