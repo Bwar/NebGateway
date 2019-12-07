@@ -1,18 +1,18 @@
 CC = gcc
 CXX = g++
-CFLAGS = -g -O2 -fPIC 
-cplusplus_version=$(shell g++ --version | grep "^g++" | awk '{if ($$NF > 5.0) print "c++14"; else print "c++11";}')
-CXXFLAG =  -std=$(cplusplus_version) -g2 -O3 -Wall -Wno-unused-function -m64 -Wl,--export-dynamic -D_GNU_SOURCE=1 -D_REENTRANT -D__GUNC__ -fPIC -DNODE_BEAT=10.0 
 
+CFLAGS = -g -O3 -Wall -Wno-unused-function -m64 -Wl,--export-dynamic -D__GUNC__ -fPIC 
+cplusplus_version=$(shell g++ -dumpversion | awk '{if ($$NF > 5.0) print "c++14"; else print "c++11";}')
+CXXFLAG = -std=$(cplusplus_version) -g -O3 -Wall -Wno-unused-function -m64 -Wl,--export-dynamic -D_GNU_SOURCE=1 -D_REENTRANT -D__GUNC__ -fPIC  -DNODE_BEAT=10.0 
 ARCH:=$(shell uname -m)
 
 ARCH32:=i686
 ARCH64:=x86_64
 
 ifeq ($(ARCH),$(ARCH64))
-SYSTEM_LIB_PATH:=/usr/lib64
+	SYSTEM_LIB_PATH:=/usr/lib64:/usr/local/lib64
 else
-SYSTEM_LIB_PATH:=/usr/lib
+	SYSTEM_LIB_PATH:=/usr/lib:/usr/local/lib
 endif
 LIB3RD_PATH = ../../NebulaDepend
 NEBULA_PATH = ../../Nebula

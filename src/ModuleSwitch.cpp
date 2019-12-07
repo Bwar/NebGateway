@@ -141,6 +141,7 @@ bool ModuleSwitch::AnyMessage(
         Response(pChannel, oInHttpMsg, 10009, "Concurrent request exceed 5! response by gateway.");
         return(true);
     }
+    return(false);
 }
 
 void ModuleSwitch::Response(std::shared_ptr<neb::SocketChannel> pChannel,
